@@ -4,7 +4,11 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"golang.org/x/sync/singleflight"
 )
+
+var group singleflight.Group
 
 const defaultCalue = 100
 
@@ -35,14 +39,20 @@ func (c *Cache) Get(key int) int {
 		return v
 	}
 
-	// 非同期にキャッシュを更新する
-	go func() {
+	// singleflight で同時に同じキーで呼ばれた場合は一つだけ処理を実行する
+	vv, err, _ := group.Do(fmt.Sprintf("cacheGet_%d", key), func() (interface{}, error) {
+		value := HeavyGet(key)
 		v = HeavyGet(key)
 		c.Set(key, v)
-	}()
+		return value, nil
+	})
 
-	// とりあえずデフォルト値を返す
-	return defaultCalue
+	if err != nil {
+		panic(err)
+	}
+
+	// interface{} 型なのでint にキャスト
+	return vv.(int)
 }
 
 func HeavyGet(key int) int {
@@ -59,7 +69,8 @@ type user struct {
 func main() {
 	mCache := NewCache()
 	fmt.Println(mCache.Get(1))
-	time.Sleep(3 * time.Second)
+	fmt.Println(mCache.Get(1))
+	fmt.Println(mCache.Get(1))
 	fmt.Println(mCache.Get(1))
 
 }
