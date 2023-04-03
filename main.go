@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+const defaultCalue = 100
+
 type Cache struct {
 	mu    sync.Mutex
 	items map[int]int
@@ -32,9 +34,15 @@ func (c *Cache) Get(key int) int {
 		fmt.Println("cache hit")
 		return v
 	}
-	v = HeavyGet(key)
-	c.Set(key, v)
-	return v
+
+	// 非同期にキャッシュを更新する
+	go func() {
+		v = HeavyGet(key)
+		c.Set(key, v)
+	}()
+
+	// とりあえずデフォルト値を返す
+	return defaultCalue
 }
 
 func HeavyGet(key int) int {
@@ -44,8 +52,14 @@ func HeavyGet(key int) int {
 	return value
 }
 
+type user struct {
+	userID int
+}
+
 func main() {
 	mCache := NewCache()
 	fmt.Println(mCache.Get(1))
+	time.Sleep(3 * time.Second)
 	fmt.Println(mCache.Get(1))
+
 }
